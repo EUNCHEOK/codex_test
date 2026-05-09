@@ -1,63 +1,166 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Windows.Forms;
 
 namespace DailyCheckInJournal
 {
     internal static class CheckIn
     {
-        private static int Main(string[] args)
+        [STAThread]
+        private static void Main()
         {
-            Console.OutputEncoding = Encoding.UTF8;
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new CheckInForm());
+        }
+    }
 
-            if (args.Length == 0 || HasFlag(args, "--help") || HasFlag(args, "-h"))
+    internal sealed class CheckInForm : Form
+    {
+        private readonly string root;
+        private readonly string date;
+        private readonly string filePath;
+        private readonly TextBox checkInTextBox;
+        private readonly TextBox noteTextBox;
+        private readonly Label statusLabel;
+        private readonly Button saveButton;
+        private readonly Button openLogsButton;
+
+        public CheckInForm()
+        {
+            root = ProjectPaths.FindProjectRoot();
+            date = DateTime.Now.ToString("yyyy-MM-dd");
+            filePath = Path.Combine(root, "logs", date + ".md");
+
+            Text = "Daily Check-In Journal";
+            StartPosition = FormStartPosition.CenterScreen;
+            MinimumSize = new Size(520, 360);
+            Size = new Size(560, 400);
+            Font = new Font("Segoe UI", 9F);
+
+            var titleLabel = new Label
             {
-                PrintUsage();
-                return args.Length == 0 ? 1 : 0;
+                AutoSize = true,
+                Font = new Font(Font.FontFamily, 14F, FontStyle.Bold),
+                Location = new Point(20, 18),
+                Text = "Daily Check-In"
+            };
+
+            var dateLabel = new Label
+            {
+                AutoSize = true,
+                Location = new Point(22, 54),
+                Text = "Date: " + date
+            };
+
+            var checkInLabel = new Label
+            {
+                AutoSize = true,
+                Location = new Point(22, 88),
+                Text = "Check-in"
+            };
+
+            checkInTextBox = new TextBox
+            {
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Location = new Point(24, 110),
+                Size = new Size(492, 24)
+            };
+
+            var noteLabel = new Label
+            {
+                AutoSize = true,
+                Location = new Point(22, 150),
+                Text = "Note (optional)"
+            };
+
+            noteTextBox = new TextBox
+            {
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                Location = new Point(24, 172),
+                Multiline = true,
+                ScrollBars = ScrollBars.Vertical,
+                Size = new Size(492, 92)
+            };
+
+            saveButton = new Button
+            {
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Location = new Point(296, 286),
+                Size = new Size(106, 32),
+                Text = "Save"
+            };
+            saveButton.Click += SaveButton_Click;
+
+            openLogsButton = new Button
+            {
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Location = new Point(410, 286),
+                Size = new Size(106, 32),
+                Text = "Open logs"
+            };
+            openLogsButton.Click += OpenLogsButton_Click;
+
+            statusLabel = new Label
+            {
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                AutoEllipsis = true,
+                Location = new Point(24, 328),
+                Size = new Size(492, 20),
+                Text = BuildInitialStatus()
+            };
+
+            Controls.Add(titleLabel);
+            Controls.Add(dateLabel);
+            Controls.Add(checkInLabel);
+            Controls.Add(checkInTextBox);
+            Controls.Add(noteLabel);
+            Controls.Add(noteTextBox);
+            Controls.Add(saveButton);
+            Controls.Add(openLogsButton);
+            Controls.Add(statusLabel);
+
+            AcceptButton = saveButton;
+        }
+
+        private string BuildInitialStatus()
+        {
+            if (File.Exists(filePath))
+            {
+                saveButton.Enabled = false;
+                return "Today's check-in already exists.";
             }
 
-            string note = "";
-            var checkInParts = new List<string>();
+            return "Ready to create logs\\" + date + ".md";
+        }
 
-            for (int i = 0; i < args.Length; i++)
-            {
-                if (args[i] == "--note" || args[i] == "-n")
-                {
-                    if (i + 1 >= args.Length)
-                    {
-                        Console.Error.WriteLine("Missing note text after " + args[i]);
-                        return 1;
-                    }
-
-                    note = args[++i];
-                    continue;
-                }
-
-                checkInParts.Add(args[i]);
-            }
-
-            string checkIn = string.Join(" ", checkInParts).Trim();
+        private void SaveButton_Click(object sender, EventArgs e)
+        {
+            string checkIn = checkInTextBox.Text.Trim();
+            string note = noteTextBox.Text.Trim();
 
             if (string.IsNullOrWhiteSpace(checkIn))
             {
-                Console.Error.WriteLine("Check-in text is required.");
-                return 1;
+                MessageBox.Show(this, "Write a short check-in first.", "Daily Check-In", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                checkInTextBox.Focus();
+                return;
             }
-
-            string root = FindProjectRoot();
-            string date = DateTime.Now.ToString("yyyy-MM-dd");
-            string logsDir = Path.Combine(root, "logs");
-            string filePath = Path.Combine(logsDir, date + ".md");
-
-            Directory.CreateDirectory(logsDir);
 
             if (File.Exists(filePath))
             {
-                Console.Error.WriteLine("A check-in already exists for " + date + ": " + filePath);
-                return 1;
+                saveButton.Enabled = false;
+                statusLabel.Text = "Today's check-in already exists.";
+                MessageBox.Show(this, "A check-in already exists for " + date + ".", "Daily Check-In", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
+
+            string logsDir = Path.GetDirectoryName(filePath);
+            Directory.CreateDirectory(logsDir);
 
             var lines = new List<string>
             {
@@ -68,32 +171,35 @@ namespace DailyCheckInJournal
 
             if (!string.IsNullOrWhiteSpace(note))
             {
-                lines.Add("- Note: " + note.Trim());
+                lines.Add("- Note: " + note);
             }
 
             File.WriteAllLines(filePath, lines.ToArray(), new UTF8Encoding(false));
-            Console.WriteLine("Created " + filePath);
-            Console.WriteLine("Commit with: git add logs/" + date + ".md && git commit -m \"Add check-in for " + date + "\"");
-            return 0;
+
+            saveButton.Enabled = false;
+            statusLabel.Text = "Created " + filePath;
+
+            MessageBox.Show(
+                this,
+                "Check-in saved.\n\nCommit with:\ngit add logs/" + date + ".md\ngit commit -m \"Add check-in for " + date + "\"",
+                "Daily Check-In",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
-        private static bool HasFlag(string[] args, string flag)
+        private void OpenLogsButton_Click(object sender, EventArgs e)
         {
-            foreach (string arg in args)
-            {
-                if (arg == flag)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            string logsDir = Path.Combine(root, "logs");
+            Directory.CreateDirectory(logsDir);
+            Process.Start("explorer.exe", logsDir);
         }
+    }
 
-        private static string FindProjectRoot()
+    internal static class ProjectPaths
+    {
+        public static string FindProjectRoot()
         {
-            string current = Directory.GetCurrentDirectory();
-            string fromCurrent = WalkForRoot(current);
+            string fromCurrent = WalkForRoot(Directory.GetCurrentDirectory());
 
             if (fromCurrent != null)
             {
@@ -103,7 +209,7 @@ namespace DailyCheckInJournal
             string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string fromExe = WalkForRoot(exeDir);
 
-            return fromExe ?? current;
+            return fromExe ?? Directory.GetCurrentDirectory();
         }
 
         private static string WalkForRoot(string start)
@@ -124,15 +230,6 @@ namespace DailyCheckInJournal
             }
 
             return null;
-        }
-
-        private static void PrintUsage()
-        {
-            Console.WriteLine("Daily Check-In Journal");
-            Console.WriteLine();
-            Console.WriteLine("Usage:");
-            Console.WriteLine("  checkin.exe \"오늘 한 줄 메모\"");
-            Console.WriteLine("  checkin.exe \"오늘 한 줄 메모\" --note \"선택 메모\"");
         }
     }
 }

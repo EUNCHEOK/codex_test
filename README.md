@@ -35,17 +35,9 @@ PowerShell에서 다음 명령을 실행합니다.
 
 ## EXE로 실행하기
 
-Windows에서 바로 실행할 수 있는 `dist/checkin.exe`를 사용할 수 있습니다.
+Windows에서 바로 실행할 수 있는 `dist/checkin.exe`를 사용할 수 있습니다. 파일을 더블클릭하면 작은 입력 창이 열립니다.
 
-```powershell
-.\dist\checkin.exe "오늘 한 줄 메모"
-```
-
-선택 메모를 함께 남기려면 `--note` 또는 `-n`을 사용합니다.
-
-```powershell
-.\dist\checkin.exe "작은 기능을 정리했다" --note "내일은 README를 다듬기"
-```
+창에서 오늘의 한 줄 체크인과 선택 메모를 입력한 뒤 `Save`를 누르면 `logs/YYYY-MM-DD.md` 파일이 생성됩니다. 이미 오늘 파일이 있으면 덮어쓰지 않습니다.
 
 EXE를 다시 빌드하려면 다음 명령을 실행합니다.
 

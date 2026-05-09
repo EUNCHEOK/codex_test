@@ -18,6 +18,10 @@ if (-not (Test-Path -LiteralPath $dist)) {
     New-Item -ItemType Directory -Path $dist | Out-Null
 }
 
-& $compiler /nologo /target:exe /optimize+ /out:$out $src
+& $compiler /nologo /target:winexe /optimize+ /codepage:65001 /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /out:$out $src
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Build failed with exit code $LASTEXITCODE."
+}
 
 Write-Host "Built $out"
