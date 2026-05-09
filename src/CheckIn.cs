@@ -32,11 +32,14 @@ namespace DailyCheckInJournal
         private readonly Button openLogsButton;
         private readonly PlaceholderText checkInPlaceholder;
         private readonly PlaceholderText notePlaceholder;
+        private readonly string relativeLogPath;
+        private bool savedInThisSession;
 
         public CheckInForm()
         {
             root = ProjectPaths.FindProjectRoot();
             date = DateTime.Now.ToString("yyyy-MM-dd");
+            relativeLogPath = "logs/" + date + ".md";
             filePath = Path.Combine(root, "logs", date + ".md");
 
             Text = "Daily Check-In Journal";
@@ -95,9 +98,9 @@ namespace DailyCheckInJournal
             saveButton = new Button
             {
                 Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-                Location = new Point(296, 286),
-                Size = new Size(106, 32),
-                Text = "Save"
+                Location = new Point(270, 286),
+                Size = new Size(132, 32),
+                Text = "Save && Commit"
             };
             saveButton.Click += SaveButton_Click;
 
@@ -140,7 +143,7 @@ namespace DailyCheckInJournal
                 return "Today's check-in already exists.";
             }
 
-            return "Ready to create logs\\" + date + ".md";
+            return "Ready to create and commit logs\\" + date + ".md";
         }
 
         private void SaveButton_Click(object sender, EventArgs e)
@@ -155,7 +158,7 @@ namespace DailyCheckInJournal
                 return;
             }
 
-            if (File.Exists(filePath))
+            if (File.Exists(filePath) && !savedInThisSession)
             {
                 saveButton.Enabled = false;
                 statusLabel.Text = "Today's check-in already exists.";
@@ -163,6 +166,54 @@ namespace DailyCheckInJournal
                 return;
             }
 
+            saveButton.Enabled = false;
+            statusLabel.Text = "Saving check-in...";
+
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    WriteCheckInFile(checkIn, note);
+                    savedInThisSession = true;
+                }
+
+                statusLabel.Text = "Committing check-in...";
+                GitResult addResult = RunGit("add -- " + QuoteArgument(relativeLogPath));
+                if (!addResult.Success)
+                {
+                    ShowGitError("git add failed", addResult);
+                    saveButton.Enabled = true;
+                    return;
+                }
+
+                string message = "Add check-in for " + date;
+                GitResult commitResult = RunGit("commit -m " + QuoteArgument(message) + " -- " + QuoteArgument(relativeLogPath));
+                if (!commitResult.Success)
+                {
+                    ShowGitError("git commit failed", commitResult);
+                    saveButton.Enabled = true;
+                    return;
+                }
+
+                statusLabel.Text = "Saved and committed " + relativeLogPath;
+
+                MessageBox.Show(
+                    this,
+                    "Check-in saved and committed.\n\n" + commitResult.Output.Trim(),
+                    "Daily Check-In",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                statusLabel.Text = "Save and commit failed.";
+                saveButton.Enabled = true;
+                MessageBox.Show(this, ex.Message, "Daily Check-In", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void WriteCheckInFile(string checkIn, string note)
+        {
             string logsDir = Path.GetDirectoryName(filePath);
             Directory.CreateDirectory(logsDir);
 
@@ -179,16 +230,65 @@ namespace DailyCheckInJournal
             }
 
             File.WriteAllLines(filePath, lines.ToArray(), new UTF8Encoding(false));
+        }
 
-            saveButton.Enabled = false;
-            statusLabel.Text = "Created " + filePath;
+        private GitResult RunGit(string arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = arguments,
+                WorkingDirectory = root,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            using (Process process = Process.Start(startInfo))
+            {
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                return new GitResult(process.ExitCode, output, error);
+            }
+        }
+
+        private static string QuoteArgument(string value)
+        {
+            return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        }
+
+        private void ShowGitError(string title, GitResult result)
+        {
+            statusLabel.Text = title + ".";
+
+            string details = result.Output.Trim();
+
+            if (!string.IsNullOrWhiteSpace(result.Error))
+            {
+                if (!string.IsNullOrWhiteSpace(details))
+                {
+                    details += "\n\n";
+                }
+
+                details += result.Error.Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(details))
+            {
+                details = "No output from git.";
+            }
 
             MessageBox.Show(
                 this,
-                "Check-in saved.\n\nCommit with:\ngit add logs/" + date + ".md\ngit commit -m \"Add check-in for " + date + "\"",
+                title + "\n\nExit code: " + result.ExitCode + "\n\n" + details,
                 "Daily Check-In",
                 MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+                MessageBoxIcon.Error);
         }
 
         private void OpenLogsButton_Click(object sender, EventArgs e)
@@ -196,6 +296,25 @@ namespace DailyCheckInJournal
             string logsDir = Path.Combine(root, "logs");
             Directory.CreateDirectory(logsDir);
             Process.Start("explorer.exe", logsDir);
+        }
+    }
+
+    internal sealed class GitResult
+    {
+        public GitResult(int exitCode, string output, string error)
+        {
+            ExitCode = exitCode;
+            Output = output ?? "";
+            Error = error ?? "";
+        }
+
+        public int ExitCode { get; private set; }
+        public string Output { get; private set; }
+        public string Error { get; private set; }
+
+        public bool Success
+        {
+            get { return ExitCode == 0; }
         }
     }
 
