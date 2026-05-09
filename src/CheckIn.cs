@@ -30,6 +30,8 @@ namespace DailyCheckInJournal
         private readonly Label statusLabel;
         private readonly Button saveButton;
         private readonly Button openLogsButton;
+        private readonly PlaceholderText checkInPlaceholder;
+        private readonly PlaceholderText notePlaceholder;
 
         public CheckInForm()
         {
@@ -71,6 +73,7 @@ namespace DailyCheckInJournal
                 Location = new Point(24, 110),
                 Size = new Size(492, 24)
             };
+            checkInPlaceholder = new PlaceholderText(checkInTextBox, "예: README 정리하고 체크인 UI를 다듬었다");
 
             var noteLabel = new Label
             {
@@ -87,6 +90,7 @@ namespace DailyCheckInJournal
                 ScrollBars = ScrollBars.Vertical,
                 Size = new Size(492, 92)
             };
+            notePlaceholder = new PlaceholderText(noteTextBox, "예: 내일은 GitHub 원격 저장소 연결하기");
 
             saveButton = new Button
             {
@@ -141,8 +145,8 @@ namespace DailyCheckInJournal
 
         private void SaveButton_Click(object sender, EventArgs e)
         {
-            string checkIn = checkInTextBox.Text.Trim();
-            string note = noteTextBox.Text.Trim();
+            string checkIn = checkInPlaceholder.Value.Trim();
+            string note = notePlaceholder.Value.Trim();
 
             if (string.IsNullOrWhiteSpace(checkIn))
             {
@@ -192,6 +196,59 @@ namespace DailyCheckInJournal
             string logsDir = Path.Combine(root, "logs");
             Directory.CreateDirectory(logsDir);
             Process.Start("explorer.exe", logsDir);
+        }
+    }
+
+    internal sealed class PlaceholderText
+    {
+        private readonly TextBox textBox;
+        private readonly string placeholder;
+        private readonly Color normalColor;
+        private bool showingPlaceholder;
+
+        public PlaceholderText(TextBox textBox, string placeholder)
+        {
+            this.textBox = textBox;
+            this.placeholder = placeholder;
+            normalColor = textBox.ForeColor;
+
+            textBox.GotFocus += TextBox_GotFocus;
+            textBox.LostFocus += TextBox_LostFocus;
+
+            ShowPlaceholder();
+        }
+
+        public string Value
+        {
+            get
+            {
+                return showingPlaceholder ? "" : textBox.Text;
+            }
+        }
+
+        private void TextBox_GotFocus(object sender, EventArgs e)
+        {
+            if (showingPlaceholder)
+            {
+                textBox.Text = "";
+                textBox.ForeColor = normalColor;
+                showingPlaceholder = false;
+            }
+        }
+
+        private void TextBox_LostFocus(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(textBox.Text))
+            {
+                ShowPlaceholder();
+            }
+        }
+
+        private void ShowPlaceholder()
+        {
+            showingPlaceholder = true;
+            textBox.Text = placeholder;
+            textBox.ForeColor = SystemColors.GrayText;
         }
     }
 
