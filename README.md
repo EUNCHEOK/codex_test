@@ -33,6 +33,26 @@ PowerShell에서 다음 명령을 실행합니다.
 
 스크립트는 오늘 날짜의 파일이 이미 있으면 덮어쓰지 않고 멈춥니다.
 
+## EXE로 실행하기
+
+Windows에서 바로 실행할 수 있는 `dist/checkin.exe`를 사용할 수 있습니다.
+
+```powershell
+.\dist\checkin.exe "오늘 한 줄 메모"
+```
+
+선택 메모를 함께 남기려면 `--note` 또는 `-n`을 사용합니다.
+
+```powershell
+.\dist\checkin.exe "작은 기능을 정리했다" --note "내일은 README를 다듬기"
+```
+
+EXE를 다시 빌드하려면 다음 명령을 실행합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-exe.ps1
+```
+
 ## 커밋 규칙
 
 체크인 파일을 만든 뒤 다음 형식으로 커밋합니다.
