@@ -99,8 +99,8 @@ namespace DailyCheckInJournal
             {
                 Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
                 Location = new Point(270, 286),
-                Size = new Size(132, 32),
-                Text = "Save && Commit"
+                Size = new Size(154, 32),
+                Text = "Save, Commit && Push"
             };
             saveButton.Click += SaveButton_Click;
 
@@ -143,7 +143,7 @@ namespace DailyCheckInJournal
                 return "Today's check-in already exists.";
             }
 
-            return "Ready to create and commit logs\\" + date + ".md";
+            return "Ready to create, commit, and push logs\\" + date + ".md";
         }
 
         private void SaveButton_Click(object sender, EventArgs e)
@@ -195,11 +195,20 @@ namespace DailyCheckInJournal
                     return;
                 }
 
-                statusLabel.Text = "Saved and committed " + relativeLogPath;
+                statusLabel.Text = "Pushing to GitHub...";
+                GitResult pushResult = RunGit("push origin HEAD:main");
+                if (!pushResult.Success)
+                {
+                    ShowGitError("git push failed", pushResult);
+                    saveButton.Enabled = true;
+                    return;
+                }
+
+                statusLabel.Text = "Saved, committed, and pushed " + relativeLogPath;
 
                 MessageBox.Show(
                     this,
-                    "Check-in saved and committed.\n\n" + commitResult.Output.Trim(),
+                    "Check-in saved, committed, and pushed to GitHub.\n\n" + MergeGitOutput(commitResult, pushResult),
                     "Daily Check-In",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -289,6 +298,31 @@ namespace DailyCheckInJournal
                 "Daily Check-In",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+        }
+
+        private static string MergeGitOutput(params GitResult[] results)
+        {
+            var output = new StringBuilder();
+
+            foreach (GitResult result in results)
+            {
+                string text = (result.Output + "\n" + result.Error).Trim();
+
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                if (output.Length > 0)
+                {
+                    output.AppendLine();
+                    output.AppendLine();
+                }
+
+                output.Append(text);
+            }
+
+            return output.Length == 0 ? "Git completed successfully." : output.ToString();
         }
 
         private void OpenLogsButton_Click(object sender, EventArgs e)

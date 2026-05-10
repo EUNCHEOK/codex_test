@@ -37,7 +37,7 @@ PowerShell에서 다음 명령을 실행합니다.
 
 Windows에서 바로 실행할 수 있는 `dist/checkin.exe`를 사용할 수 있습니다. 파일을 더블클릭하면 작은 입력 창이 열립니다.
 
-창에서 오늘의 한 줄 체크인과 선택 메모를 입력한 뒤 `Save & Commit`을 누르면 `logs/YYYY-MM-DD.md` 파일이 생성되고, 해당 파일만 자동으로 커밋됩니다. 입력칸에는 예시 문구가 회색으로 표시되고, 칸을 누르면 사라집니다. 이미 오늘 파일이 있으면 덮어쓰지 않습니다.
+창에서 오늘의 한 줄 체크인과 선택 메모를 입력한 뒤 `Save, Commit & Push`를 누르면 `logs/YYYY-MM-DD.md` 파일이 생성되고, 해당 파일만 자동으로 커밋한 다음 GitHub의 `main` 브랜치로 push됩니다. 입력칸에는 예시 문구가 회색으로 표시되고, 칸을 누르면 사라집니다. 이미 오늘 파일이 있으면 덮어쓰지 않습니다.
 
 EXE를 다시 빌드하려면 다음 명령을 실행합니다.
 
@@ -47,11 +47,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-exe.ps1
 
 ## 커밋 규칙
 
-EXE는 체크인 파일을 만든 뒤 다음 형식으로 자동 커밋합니다.
+EXE는 체크인 파일을 만든 뒤 다음 형식으로 자동 커밋하고 push합니다.
 
 ```powershell
 git add logs/YYYY-MM-DD.md
 git commit -m "Add check-in for YYYY-MM-DD"
+git push origin HEAD:main
 ```
 
 ## Daily Reminder
